@@ -1,0 +1,21 @@
+(executables
+    ((names (test0 test1 test2))
+     (public_names (test0 test1 test2))
+     (libraries (ocaml-abt))))
+
+
+(alias
+    ((name runtest)
+     (deps (test0.exe test0.input))
+     (action (run ${<} ${path:test0.input}))))
+
+(alias
+    ((name runtest)
+     (deps (test1.exe test1.input))
+     (action (run ${<} ${path:test1.input}))))
+
+(alias
+    ((name runtest)
+     (deps (test2.exe test2.input))
+     (action (run ${<} ${path:test2.input}))))
+

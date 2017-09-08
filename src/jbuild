@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+  ((name abt)
+   (public_name ocaml-abt)))
+
+(ocamllex (lexer))
+(menhir ((modules (parser))))

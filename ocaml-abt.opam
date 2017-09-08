@@ -1,0 +1,5 @@
+opam-version: "2.0"
+name: "ocaml-abt"
+version: "0.1"
+maintainer: "Peter Brottveit Bock <post@peterbb.net>"
+build: [["jbuilder" "build" "-p" name "-j" jobs]]

@@ -1,0 +1,20 @@
+
+(* This is a comment. *)
+
+(* A
+ * comment
+ * can
+ * span
+ * multiple
+ * lines. *)
+
+(* Comments (* can (* be (* nested. *) *) *) *)
+
+
+2
+
+5
+
++(2; 2) 
+
++(2; +(3; 4))

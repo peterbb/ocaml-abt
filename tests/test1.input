@@ -1,0 +1,6 @@
+lam(x.x)
+lam(x. lam(y. ap(x; x)))
+lam(x. lam(y. ap(y; y)))
+lam(x. lam(y. ap(x; y)))
+lam(x. lam(x. ap(x; x)))
+
