@@ -20,7 +20,6 @@ end
 
 module type VAR = sig
     include COMMON
-
     type sort
 
     val fresh : string -> sort -> t
@@ -30,8 +29,8 @@ end
 
 module type NAME = sig
     include COMMON
-
     type sort
+
     val fresh : string -> sort -> t
     val global : string -> sort -> t
     val sort : t -> sort
@@ -39,8 +38,7 @@ end
 
 module type LANGUAGE = sig
     module S : SORT
-    module O : OPERATOR
-        with module S = S
+    module O : OPERATOR with module S = S
 end
 
 module Symbols (S : SORT) = struct
@@ -99,18 +97,13 @@ module type S = sig
         | Var of V.t
         | App  of O.t * names * 'a abs list
 
-    (* Destruction *)
     val unfold : t -> t view
     val open_abs : t abs -> names * vars * t
     val subst_abs : t list -> t abs -> names * t
     val rename_abs : names -> t abs -> vars * t
     val subst_rename_abs : names -> t list -> t abs -> t
-
-    (* Construction *)
     val fold : t view -> t
     val abs : names -> vars -> t -> t abs
-
-    (* Misc *)
     val subst : t -> V.t -> t -> t
     val sort : t -> S.t
 end

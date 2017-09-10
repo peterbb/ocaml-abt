@@ -60,19 +60,39 @@ module type S = sig
 
     (* Destruction *)
     val unfold : t -> t view
+
+   (* [open_abs abs] will generate fresh names and
+    * variables, and insert them for the bound variables
+    * in the term. *)
     val open_abs : t abs -> names * vars * t
+
+    (* [open_abs subst abs] will generate fresh names and variables,
+     * and then open the abstraction with the fresh names
+     * substituted for the bound names, and [subst] will be
+     * substituted for the bound variables.
+     *)
     val subst_abs : t list -> t abs -> names * t
+
+
+    (* [rename_abs names abs] will generate fresh variables,
+     * and substitute the fresh variables for the bound variables,
+     * and substitute [names] for the bound names. *)
     val rename_abs : names -> t abs -> vars * t
+
+
+    (* [subst_rename_abs names subst abs] will substitute
+     * [subst] for the bound variables and rename the bound
+     * names to [names], in [abs].  *)
     val subst_rename_abs : names -> t list -> t abs -> t
 
-    (* Construction *)
     val fold : t view -> t
+
+    (* [abs names vars t] turns the (necessarily free) occurences of 
+     * the names and variables into bound variables. *)
     val abs : names -> vars -> t -> t abs
 
-    (* Misc *)
     val subst : t -> V.t -> t -> t
     val sort : t -> S.t
-
 end
 
 module Make (L : LANGUAGE) : S
