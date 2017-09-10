@@ -10,7 +10,7 @@ module Make (L : Language.S) = struct
         | L.Var x ->
             fprintf ppf "%s" (var x)
         | L.App (op, ns, args) ->
-            fprintf ppf "%s" (L.L.O.to_string op);
+            fprintf ppf "%s" (L.O.to_string op);
             begin match ns with
                 | [] -> ()
                 | [n] ->
@@ -40,7 +40,7 @@ module Make (L : Language.S) = struct
         | [] ->
             print ppf body
         | [x] ->
-            fprintf ppf "%s." x;
+            fprintf ppf "%s. " x;
             print ppf body
         | (x :: xs) ->
             fprintf ppf "%s" x;

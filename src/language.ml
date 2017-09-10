@@ -33,6 +33,7 @@ module type NAME = sig
 
     type sort
     val fresh : string -> sort -> t
+    val global : string -> sort -> t
     val sort : t -> sort
 end
 
@@ -84,8 +85,7 @@ module Symbols (S : SORT) = struct
 end
 
 module type S = sig
-    module L : LANGUAGE
-    open L
+    include LANGUAGE
 
     module V : VAR with type sort = S.t
     module N : NAME with type sort = S.t
@@ -115,8 +115,7 @@ module type S = sig
 end
 
 module Make (L : LANGUAGE) = struct
-    module L = L
-    open L
+    include L
 
     module V = Symbols(S)
     module N = V

@@ -6,6 +6,7 @@ module L = struct
 
         let eq Expr Expr = true
         let compare Expr Expr = 0
+        let to_string Expr = "expr"
     end
 
     module O = struct
@@ -43,7 +44,7 @@ module U = Abt.Util(A)
 let parse filename =
     let ich = open_in filename in
     let lexbuf = Lexing.from_channel ich in
-    let program = U.parse_file lexbuf in
+    let program = U.parse_file lexbuf L.S.Expr in
     close_in ich;
     program
 

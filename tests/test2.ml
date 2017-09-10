@@ -57,7 +57,7 @@ module U = Abt.Util(A)
 
 let program =
         Sys.argv.(1) |> open_in |> Lexing.from_channel
-        |> U.parse_file
+        |> (fun lb -> U.parse_file lb L.S.E)
 let () = List.iter (fun p -> U.print p; Format.printf "\n")  program
 
 

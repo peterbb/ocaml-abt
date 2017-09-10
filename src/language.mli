@@ -33,6 +33,7 @@ module type NAME = sig
     type sort
     
     val fresh : string -> sort -> t
+    val global : string -> sort -> t
     val sort : t -> sort
 end
 
@@ -43,8 +44,7 @@ module type LANGUAGE = sig
 end
 
 module type S = sig
-    module L : LANGUAGE
-    open L
+    include LANGUAGE
 
     module V : VAR with type sort = S.t
     module N : NAME with type sort = S.t
@@ -74,4 +74,7 @@ module type S = sig
 
 end
 
-module Make (L : LANGUAGE) : S with module L = L
+module Make (L : LANGUAGE) : S
+    with module S = L.S
+    with module O = L.O
+

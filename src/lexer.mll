@@ -11,7 +11,7 @@ let newline = "\r" | "\n" | "\r\n"
 let digit = ['0'-'9']
 let letter = ['a'-'z' 'A'-'Z']
 let other0 = '_' | '-' | '@' | '+' | '#' | '!' | '%' | '&' | '^' | '='
-let other1 = '?' | '<' | '>'
+let other1 = '?' | '<' | '>' | ":" | "\\"
 let sym = (digit | letter | other0 | other1)+
 
 

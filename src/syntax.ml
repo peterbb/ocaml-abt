@@ -2,42 +2,77 @@
 type t =
     Expr of string * string list * (string list * t) list
 
+
 module Inject (L : Language.S) = struct
 
-    let rec to_abt nctx vctx = function
+    type sort = L.S.t
+    type 'a ctx = (string * sort * 'a) list
+    type nctx = L.N.t ctx
+    type vctx = L.V.t ctx
+
+
+    (* 
+        input:
+            names : string list
+            sorts : sort list
+            make  : string -> sort -> 'a
+            ctx   : 'a ctx
+        output:
+            vars  : 'a list
+            ctx   : 'a ctx
+    *)
+    let process_binder names sorts make ctx =
+        let rec loop = function
+            | [], [] -> ([], ctx)
+            | (x :: xs), (s :: ss) ->
+                let x' = make x s in
+                let (vars, ctx) = loop (xs, ss) in
+                (x' :: vars), ((x, s, x') :: ctx)
+            | [], _::_ ->
+                failwith "too many binders"
+            | _::_, [] ->
+                failwith "not enough binders"
+        in loop (names, sorts)
+
+    let lookup x s (ctx : 'a ctx) =
+        let rec loop = function
+            | (y, t, z) :: _ when x = y && (L.S.eq s t) ->
+                z
+            | _ :: rest -> loop rest
+            | [] -> raise Not_found
+        in loop ctx
+
+    let rec to_abt (nctx : nctx) (vctx : vctx) sort = function
         | Expr (o, [], []) ->
-            begin match List.assoc o vctx with
+            begin match lookup o sort vctx with
             | v ->
                 L.fold (L.Var v)
             | exception Not_found ->
-                match L.L.O.of_string o with
+                match L.O.of_string o with
                 | Some o -> L.fold (L.App (o, [], []))
                 | None ->
-                    (* L.fold (L.Var (L.V.global o)) *) 
-                    failwith "to_abt not implemented"
+                    L.fold (L.Var (L.V.global o sort))
             end
         | Expr (o, names, args) ->
-            begin match L.L.O.of_string o with
+            begin match L.O.of_string o with
             | None -> failwith "not an operator"
             | Some o ->
-                let (_, args_sorts, _) = L.L.O.arity o in
-                let names = List.map (name_to_abt nctx) names in
+                let (_, args_sorts, _) = L.O.arity o in
+                let names = List.map (name_to_abt nctx sort) names in
                 let args = List.map2 (arg_to_abt nctx vctx) args_sorts args in
                 L.fold (L.App (o, names, args))
             end
 
-    and name_to_abt nctx x =
-        match List.assoc x nctx with
+    and name_to_abt nctx sort x =
+        match lookup x sort nctx with
         | v -> v
-        | exception _ -> failwith "name_to_abt"
+        | exception _ -> L.N.global x sort
 
-    and arg_to_abt nctx vctx (name_sorts, var_sorts, _) (vars, body) =
+    and arg_to_abt nctx vctx (name_sorts, var_sorts, sort) (vars, body) =
         let (names, vars) = split vars (List.length name_sorts) in
-        let namesx = List.map2 L.N.fresh names name_sorts in
-        let varsx = List.map2 L.V.fresh vars var_sorts in
-        let nctx = (List.combine names namesx) @ nctx in
-        let vctx = (List.combine vars varsx) @ vctx in
-        L.abs namesx varsx (to_abt nctx vctx body)
+        let namesx, nctx = process_binder names name_sorts L.N.fresh nctx in
+        let varsx, vctx = process_binder vars var_sorts L.V.fresh vctx in
+        L.abs namesx varsx (to_abt nctx vctx sort body)
 
     and split xs n = match xs, n with
         | xs, 0 -> [], xs
