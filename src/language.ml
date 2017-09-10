@@ -3,6 +3,7 @@ module type COMMON = sig
     type t
     val eq : t -> t -> bool
     val compare : t -> t -> int
+    val to_string : t -> string
 end
 
 module type SORT = sig
@@ -12,7 +13,6 @@ end
 module type OPERATOR = sig
     include COMMON
     val of_string : string -> t option
-    val to_string : t -> string
 
     module S : SORT
     val arity : t -> S.t list * (S.t list * S.t list * S.t) list * S.t
@@ -20,20 +20,20 @@ end
 
 module type VAR = sig
     include COMMON
+
     type sort
+
     val fresh : string -> sort -> t
     val global : string -> sort -> t
     val sort : t -> sort
-    val to_string : t -> string
 end
 
 module type NAME = sig
     include COMMON
-    type sort
 
+    type sort
     val fresh : string -> sort -> t
     val sort : t -> sort
-    val to_string : t -> string
 end
 
 module type LANGUAGE = sig
@@ -42,7 +42,9 @@ module type LANGUAGE = sig
         with module S = S
 end
 
-module Symbols(S : SORT) = struct
+module Symbols (S : SORT) = struct
+    type sort = S.t
+
     type t =
         | S of int * string * S.t
         | G of string * S.t
@@ -60,7 +62,6 @@ module Symbols(S : SORT) = struct
         | S _, G _ -> -1
         | G _, S _ -> +1
 
-    type sort = S.t
 
     let sort = function
         | S (_, _, s) | G (_, s) -> s
@@ -150,29 +151,50 @@ module Make (L : LANGUAGE) = struct
         | App (o, _, _) ->
             match O.arity o with (_, _, s) -> s
 
-    (* NB: does not recurse. *)
-    let check names args (name_sorts, arg_valences, _) =
-        let check_sort id sort = 
-            if not (S.eq (V.sort id) sort) then
-                failwith "sort error"
-        in
-        (* TODO: handle Invalid_argument. *)
-        List.iter2 check_sort names name_sorts;
-        (* TODO: check rest. *)
-        ()
+    exception Sort_error_in_var_binder of 
+        { var : V.t; expected : S.t; given : S.t }
+    exception Sort_error_in_name_binder of
+        { var : N.t; expected : S.t; given : S.t }
+    exception Sort_error_in_argument of
+        { expr : unit; expected : S.t; given : S.t }
 
+    (* This function checks whether indexes are correct,
+     * and if the bindings and the body of the arguments
+     * have the correct type. The bodies are assumed to be well
+     * typed. *)
+    let check indexes args (index_sorts, arg_valences, _) =
+        (* Here 'XXX' marks where proper handeling and reporting
+         * of sort errors are missing. *)
+        let same_sort s0 s1 =
+            if not (S.eq s0 s1) then
+                failwith "not same sort" (* XXX *)
+        in
+        let check_arg (ns, xs, body) (ns_sorts, xs_sorts, body_sort) =
+            let ns = List.map N.sort ns in
+            let xs = List.map V.sort xs in
+            List.iter2 same_sort ns ns_sorts; (* XXX *)
+            List.iter2 same_sort xs xs_sorts; (* XXX *)
+            if not (S.eq (sort body) body_sort) then
+                raise (Sort_error_in_argument {
+                    expr = ();
+                    expected = body_sort;
+                    given = sort body
+                })
+        in
+        let indexes = List.map N.sort indexes in
+        List.iter2 same_sort indexes index_sorts; (* XXX *)
+        List.iter2 check_arg args arg_valences (* XXX *)
 
     let unfold = function
-        | I.Var (Bound _) ->
-            failwith "unfold: bound variable"
-        | I.Var (Free x) ->
-            E.Var x
         | I.App (o, ns, args) ->
             let f = function
                 | Free x -> x
-                | Bound _ -> failwith "unfold: bound name"
+                | Bound _ -> assert false
             in
             E.App (o, List.map f ns, args)
+        | I.Var (Free x) ->
+            E.Var x
+        | I.Var (Bound _) -> assert false
 
     let fold = function
         | E.Var x ->
@@ -267,8 +289,10 @@ module Make (L : LANGUAGE) = struct
 
     let subst term x =
         let rec subst = function
-            | I.Var (Free y) when V.eq x y -> term
-            | I.Var _ as y -> y
+            | I.Var (Free y) when V.eq x y ->
+                term
+            | I.Var _ as y ->
+                y
             | I.App (o, ns, args) ->
                 I.App (o, ns, List.map subst_arg args)
         and subst_arg (names, args, body) = 

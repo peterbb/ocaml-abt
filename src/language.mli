@@ -2,6 +2,7 @@ module type COMMON = sig
     type t
     val eq : t -> t -> bool
     val compare : t -> t -> int
+    val to_string : t -> string
 end
 
 module type SORT = sig
@@ -11,7 +12,6 @@ end
 module type OPERATOR = sig
     include COMMON
     val of_string : string -> t option
-    val to_string : t -> string
 
     module S : SORT
     val arity : t -> S.t list * (S.t list * S.t list * S.t) list * S.t
@@ -19,14 +19,13 @@ end
 
 module type VAR = sig
     include COMMON
+
     type sort
 
     (* Note that [fresh x s] is different from [fresh x s]. *)
     val fresh : string -> sort -> t
     val global : string -> sort -> t
-
     val sort : t -> sort
-    val to_string : t -> string
 end
 
 module type NAME = sig
@@ -35,7 +34,6 @@ module type NAME = sig
     
     val fresh : string -> sort -> t
     val sort : t -> sort
-    val to_string : t -> string
 end
 
 module type LANGUAGE = sig
