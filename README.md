@@ -8,7 +8,7 @@ this give:
 
 * A module implementing multi-sorted abstract binding trees with
 variables (subject to substitution) and symbols (subject to renameing).
-Both variables and symbols are considered equal up to renaming.
+Bound variables and and are considered equal up to renaming.
 * A pretty printer and a parser.
 
 
