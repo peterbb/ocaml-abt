@@ -15,7 +15,7 @@ module L = struct
             | Num of int
             | Add
 
-        let of_string = function
+        let of_string str _sort = match str with
             | "+" -> Some Add
             | x -> Some (Num (int_of_string x))
 

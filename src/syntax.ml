@@ -48,13 +48,13 @@ module Inject (L : Language.S) = struct
             | v ->
                 L.fold (L.Var v)
             | exception Not_found ->
-                match L.O.of_string o with
+                match L.O.of_string o sort with
                 | Some o -> L.fold (L.App (o, [], []))
                 | None ->
                     L.fold (L.Var (L.V.global o sort))
             end
         | Expr (o, names, args) ->
-            begin match L.O.of_string o with
+            begin match L.O.of_string o sort with
             | None -> failwith "not an operator"
             | Some o ->
                 let (_, args_sorts, _) = L.O.arity o in

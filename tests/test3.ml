@@ -38,18 +38,19 @@ module Spec = struct
             | All -> "!"
             | Check -> ":"
 
-        let of_string = function
-            | "\\" -> Some Fn
-            | "@"  -> Some Ap
-            | "\\\\" -> Some TFn
-            | "#" -> Some TAp
-            | "->" -> Some Ar
-            | "!" -> Some All
-            | ":" -> Some Check
-            | _ -> None
-
         module S = S
         open S
+
+        let of_string str sort = match str, sort with
+            | "\\", E  -> Some Fn
+            | "@", E  -> Some Ap
+            | "\\\\", E -> Some TFn
+            | "#", E -> Some TAp
+            | "->", T -> Some Ar
+            | "!", T -> Some All
+            | ":", J -> Some Check
+            | _ -> None
+
         let abs x y = [], [x], y
         let only x = [], [], x
 

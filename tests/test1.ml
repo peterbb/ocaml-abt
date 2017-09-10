@@ -27,7 +27,7 @@ module L = struct
             | Lam, Ap -> +1
             | Ap, Lam -> -1
 
-        let of_string = function
+        let of_string str _sort = match str with
             | "ap" -> Some Ap
             | "lam" -> Some Lam
             | _ -> None

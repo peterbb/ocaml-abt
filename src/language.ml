@@ -12,9 +12,9 @@ end
 
 module type OPERATOR = sig
     include COMMON
-    val of_string : string -> t option
-
     module S : SORT
+
+    val of_string : string -> S.t -> t option
     val arity : t -> S.t list * (S.t list * S.t list * S.t) list * S.t
 end
 

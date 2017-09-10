@@ -37,11 +37,11 @@ module L = struct
             | Arr -> [], [[], [], T; [], [], T], T
 
 
-        let of_string = function
-            | "ap" -> Some Ap
-            | "lam" -> Some Lam
-            | "->" -> Some Arr
-            | "int" -> Some Int
+        let of_string str sort = match str, sort with
+            | "ap", E -> Some Ap
+            | "lam", E -> Some Lam
+            | "->", T -> Some Arr
+            | "int", T -> Some Int
             | _ -> None
 
         let to_string = function
