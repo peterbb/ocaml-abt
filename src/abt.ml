@@ -6,13 +6,24 @@ module Util (L : Language.S) = struct
     module Reader  = Syntax.Inject(L)
     module Printer = Printer.Make(L)
 
+    let check_correct_sort sort abt = 
+        if L.S.eq (L.sort abt) sort then
+            ()
+        else
+            failwith "wrong sort"
+
     let parse_expression lexbuf sort =
-        Parser.expression Lexer.token lexbuf
-        |> Reader.to_abt [] [] sort
+        let abt = Parser.expression Lexer.token lexbuf
+                  |> Reader.to_abt [] [] sort in
+        check_correct_sort sort abt;
+        abt
 
     let parse_file lexbuf sort =
-        Parser.slurp Lexer.token lexbuf
-        |> List.map (Reader.to_abt [] [] sort)
+        let ps = Parser.slurp Lexer.token lexbuf
+                 |> List.map (Reader.to_abt [] [] sort)
+        in 
+        List.iter (check_correct_sort sort) ps;
+        ps
 
     let parse_filename filename sort =
         let ch = open_in filename in

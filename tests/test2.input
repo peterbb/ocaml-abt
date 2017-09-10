@@ -1,6 +1,4 @@
 
 lam(int; x. x)
-->(int; int)
-{int -> int}
 lam({int -> int}; f. 
     lam(int; x. ap(f; x)))

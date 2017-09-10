@@ -71,6 +71,7 @@ module type S = sig
 
     (* Misc *)
     val subst : t -> V.t -> t -> t
+    val sort : t -> S.t
 
 end
 
