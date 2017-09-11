@@ -12,6 +12,8 @@ Bound variables and and are considered equal up to renaming.
 * A pretty printer and a parser.
 
 
+## Credits
+Based on ABT's as described in Robert Harper's Practical Foundations of Programming Languages and Jon Sterling's implementation in SML.
 
 
 
