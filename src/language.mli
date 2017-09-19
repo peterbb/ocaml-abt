@@ -49,14 +49,16 @@ module type S = sig
     module V : VAR with type sort = S.t
     module N : NAME with type sort = S.t
 
-    type names = N.t list
-    type vars = V.t list
+    type 'a loc = Loc.t * 'a
+
+    type names = N.t loc list
+    type vars = V.t loc list
 
     type t
     type 'a abs
     type 'a view =
-        | Var of V.t
-        | App  of O.t * names * 'a abs list
+        | Var of V.t loc
+        | App  of O.t loc * names * 'a abs list
 
     (* Destruction *)
     val unfold : t -> t view

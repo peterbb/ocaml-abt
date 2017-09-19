@@ -88,14 +88,16 @@ module type S = sig
     module V : VAR with type sort = S.t
     module N : NAME with type sort = S.t
 
-    type names = N.t list
-    type vars = V.t list
+    type 'a loc = Loc.t * 'a
+
+    type names = N.t loc list
+    type vars = V.t loc list
 
     type t
     type 'a abs
     type 'a view =
-        | Var of V.t
-        | App  of O.t * names * 'a abs list
+        | Var of V.t loc
+        | App  of O.t loc * names * 'a abs list
 
     val unfold : t -> t view
     val open_abs : t abs -> names * vars * t
@@ -114,94 +116,85 @@ module Make (L : LANGUAGE) = struct
     module V = Symbols(S)
     module N = V
 
-    type names = N.t list
-    type vars = V.t list
+    type 'a loc = Loc.t * 'a
+
+    type names = N.t loc list
+    type vars = V.t loc list
 
     type var =
         | Free  of V.t
         | Bound of int * S.t
 
-    type 'a abs = N.t list * V.t list * 'a
+    type 'a abs = names * vars * 'a
 
     module I = struct
         type t =
-            | Var   of var
-            | App   of O.t * var list * t abs list
+            | Var   of var loc
+            | App   of O.t loc * var loc list * t abs list
     end
 
     module E = struct
         type 'a view =
-            | Var of V.t
-            | App  of O.t * N.t list * 'a abs list
+            | Var of V.t loc
+            | App  of O.t loc * names * 'a abs list
     end 
 
     include I
     include E
 
     let sort = function
-        | I.Var (Bound (_, s)) -> s
-        | I.Var (Free x) -> V.sort x
-        | App (o, _, _) ->
+        | I.Var (_, Bound (_, s)) -> s
+        | I.Var (_, Free x) -> V.sort x
+        | App ((_, o), _, _) ->
             match O.arity o with (_, _, s) -> s
 
-    exception Sort_error_in_var_binder of 
-        { var : V.t; expected : S.t; given : S.t }
-    exception Sort_error_in_name_binder of
-        { var : N.t; expected : S.t; given : S.t }
-    exception Sort_error_in_argument of
-        { expr : unit; expected : S.t; given : S.t }
+    let (>>) f g x = f (g x)
 
     (* This function checks whether indexes are correct,
      * and if the bindings and the body of the arguments
      * have the correct type. The bodies are assumed to be well
      * typed. *)
     let check indexes args (index_sorts, arg_valences, _) =
-        (* Here 'XXX' marks where proper handeling and reporting
-         * of sort errors are missing. *)
         let same_sort s0 s1 =
             if not (S.eq s0 s1) then
-                failwith "not same sort" (* XXX *)
+                failwith "not same sort"
         in
         let check_arg (ns, xs, body) (ns_sorts, xs_sorts, body_sort) =
-            let ns = List.map N.sort ns in
-            let xs = List.map V.sort xs in
-            List.iter2 same_sort ns ns_sorts; (* XXX *)
-            List.iter2 same_sort xs xs_sorts; (* XXX *)
+            let ns = List.map (N.sort >> snd) ns in 
+            let xs = List.map (V.sort >> snd) xs in
+            List.iter2 same_sort ns ns_sorts;
+            List.iter2 same_sort xs xs_sorts;
             if not (S.eq (sort body) body_sort) then
-                raise (Sort_error_in_argument {
-                    expr = ();
-                    expected = body_sort;
-                    given = sort body
-                })
+                failwith "type error"
         in
-        let indexes = List.map N.sort indexes in
-        List.iter2 same_sort indexes index_sorts; (* XXX *)
-        List.iter2 check_arg args arg_valences (* XXX *)
+        let indexes = List.map (N.sort >> snd) indexes in
+        List.iter2 same_sort indexes index_sorts;
+        List.iter2 check_arg args arg_valences
 
     let unfold = function
         | I.App (o, ns, args) ->
             let f = function
-                | Free x -> x
-                | Bound _ -> assert false
+                | (l, Free x) -> (l, x)
+                | (_, Bound _) -> assert false
             in
             E.App (o, List.map f ns, args)
-        | I.Var (Free x) ->
-            E.Var x
-        | I.Var (Bound _) -> assert false
+        | I.Var (l, Free x) ->
+            E.Var (l, x)
+        | I.Var (_, Bound _) -> assert false
 
     let fold = function
-        | E.Var x ->
-            I.Var (Free x)
-        | E.App (o, ns, args) ->
+        | E.Var (l, x) ->
+            I.Var (l, Free x)
+        | E.App ((l, o), ns, args) ->
             check ns args (O.arity o);
-            I.App (o, List.map (fun n -> Free n) ns, args)
+            I.App ((l, o), List.map (fun (l, n) -> l, Free n) ns, args)
 
     let apply subst =
         let lookup index x = List.nth subst (x - index) in
 
         let rec subst_tm index = function
-            | I.Var (Free _) as x -> x
-            | I.Var (Bound (i, _)) as x ->
+            | I.Var (_, Free _) as x -> x
+            | I.Var (_, Bound (i, _)) as x ->
                 begin match lookup index i with
                 | t -> t
                 | exception _ -> x
@@ -211,10 +204,10 @@ module Make (L : LANGUAGE) = struct
                 let args = List.map (subst_args index) args in
                 I.App (o, ns, args)
         and subst_name index = function
-            | Free _ as n -> n
-            | Bound (i, _) as n ->
+            | _, Free _ as n -> n
+            | _, Bound (i, _) as n ->
                 begin match lookup index i with
-                | I.Var x -> x
+                | I.Var (l, x) -> (l, x)
                 | I.App _ -> failwith "internal error: subst_name"
                 | exception _ -> n
                 end
@@ -224,17 +217,17 @@ module Make (L : LANGUAGE) = struct
         in subst_tm 0
 
     let subst_rename_abs names values (_, _, body) =
-        let f x = I.Var (Free x) in
+        let f (l, x) = I.Var (l, Free x) in
         let sigma = List.rev ((List.map f names) @ values) in
         (* TODO: type check *)
         apply sigma body
 
-    let refresh_all = List.map V.refresh 
+    let refresh_all = List.map (fun (l, x) -> (l, V.refresh x))
 
     let open_abs ((names, args, _) as body) =
         let names = refresh_all names in
         let args = refresh_all args in
-        let vals = List.map (fun x -> I.Var (Free x)) args in
+        let vals = List.map (fun (l, x) -> I.Var (l, Free x)) args in
         (names, args, subst_rename_abs names vals body)
         
     let subst_abs terms ((names, _, _) as body) =
@@ -243,24 +236,24 @@ module Make (L : LANGUAGE) = struct
 
     let rename_abs names ((_, args, _) as body)= 
         let args = refresh_all args in
-        let vals = List.map (fun x -> I.Var (Free x)) args in
+        let vals = List.map (fun (l, x) -> I.Var (l, Free x)) args in
         (args, subst_rename_abs names vals body)
 
-    let abs names vars body =
+    let abs (names : names) (vars : vars) body =
 
         let find x =
             let rec loop index = function
             | [] -> raise Not_found
-            | y :: _ when V.eq x y -> index
+            | (_, y) :: _ when V.eq x y -> index
             | _ :: xs -> loop (index + 1) xs
             in loop 0
         in
 
         let rec abs_tm index = function
-            | I.Var (Bound _) as tm -> tm
-            | I.Var (Free x) as tm ->
+            | I.Var (_, Bound _) as tm -> tm
+            | I.Var (l, Free x) as tm ->
                 begin match find x vars with
-                | i -> I.Var (Bound (i + index, V.sort x))
+                | i -> I.Var (l, Bound (i + index, V.sort x))
                 | exception Not_found -> tm
                 end
             | I.App (o, ns, args) ->
@@ -268,10 +261,10 @@ module Make (L : LANGUAGE) = struct
                 let args = List.map (abs_arg index) args in
                 I.App (o, ns, args)
         and abs_ns index = function
-            | Bound _ as x -> x
-            | Free x as v ->
+            | _, Bound _ as x -> x
+            | l, Free x as v ->
                 begin match find x names with
-                | i -> Bound (i + index, V.sort x)
+                | i -> (l, Bound (i + index, V.sort x))
                 | exception Not_found -> v
                 end
         and abs_arg index = function
@@ -282,7 +275,7 @@ module Make (L : LANGUAGE) = struct
 
     let subst term x =
         let rec subst = function
-            | I.Var (Free y) when V.eq x y ->
+            | I.Var (_, Free y) when V.eq x y ->
                 term
             | I.Var _ as y ->
                 y

@@ -2,6 +2,12 @@
 {
     open Lexing 
     open Parser
+
+    let pos lexbuf =
+        Loc.{
+            _start = lexeme_start_p lexbuf;
+            _end = lexeme_end_p lexbuf;
+        }
 }
 
 
@@ -30,8 +36,7 @@ rule token = parse
     | "{"           { LBRACE }
     | "}"           { RBRACE }
 
-    | sym as s      { SYM s }
-
+    | sym as s      { SYM (pos lexbuf, s) }
 
 and comment = parse
     | "*)"          { () }

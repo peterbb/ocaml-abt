@@ -4,20 +4,23 @@ open Format
 module Make (L : Language.S) = struct
     let name = L.N.to_string
     let var = L.V.to_string
+
+    let name' (_, x) = name x
+    let var' (_, x) = var x
     
     let rec print ppf tm =
         match L.unfold tm with
-        | L.Var x ->
+        | L.Var (_, x) ->
             fprintf ppf "%s" (var x)
-        | L.App (op, ns, args) ->
+        | L.App ((_, op), ns, args) ->
             fprintf ppf "%s" (L.O.to_string op);
             begin match ns with
                 | [] -> ()
-                | [n] ->
+                | [_, n] ->
                     fprintf ppf "[%s]" (name n)
-                | n::ns ->
+                | (_, n)::ns ->
                     fprintf ppf "[%s" (name n);
-                    List.iter (fun n -> fprintf ppf " %s" (name n)) ns;
+                    List.iter (fun (_, n) -> fprintf ppf " %s" (name n)) ns;
                     fprintf ppf "]"
             end;
             begin match args with
@@ -36,7 +39,7 @@ module Make (L : Language.S) = struct
     and print_abs ppf prefix abs = 
         fprintf ppf "%s" prefix;
         let (ns, xs, body) = L.open_abs abs in
-        match List.map name ns @ List.map var xs with
+        match List.map name' ns @ List.map var' xs with
         | [] ->
             print ppf body
         | [x] ->

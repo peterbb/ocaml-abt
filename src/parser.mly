@@ -1,4 +1,4 @@
-%token <string> SYM
+%token <Loc.t * string> SYM
 %token EOF
 %token LPAR RPAR LBRACE RBRACE LBRACK RBRACK
 %token SEMICOLON DOT
