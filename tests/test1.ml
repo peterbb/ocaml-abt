@@ -36,13 +36,19 @@ module L = struct
             | Ap -> "ap"
             | Lam -> "lam"
     end
+
+    module F = struct
+        open Abt.Language
+        let fixity = function
+            | _ -> Nofix
+    end
 end
 
 module A = Abt.Language.Make(L)
 module U = Abt.Util(A)
 
 let program =
-        U.parse_filename Sys.argv.(1) L.S.E
+        U.parse_filename ~sort:L.S.E Sys.argv.(1)
 let () = List.iter (fun p -> U.print p; Format.printf "\n")  program
 
 

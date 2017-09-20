@@ -50,14 +50,18 @@ module L = struct
             | Arr -> "->"
             | Int -> "int"
     end
+
+    module F = struct
+        open Abt.Language
+        let fixity = function
+            | "->" -> Infix
+            | _ -> Nofix
+    end
 end
 
 module A = Abt.Language.Make(L)
 module U = Abt.Util(A)
 
-let program =
-        Sys.argv.(1) |> open_in |> Lexing.from_channel
-        |> (fun lb -> U.parse_file lb L.S.E)
+let program = U.parse_filename ~sort:L.S.E Sys.argv.(1)
 let () = List.iter (fun p -> U.print p; Format.printf "\n")  program
-
 

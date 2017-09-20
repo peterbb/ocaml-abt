@@ -63,13 +63,20 @@ module Spec = struct
             | All -> [], [abs T T], T
             | Check -> [], [only E; only T], J
     end
+
+    module F = struct
+        open Abt.Language
+        let fixity = function
+            | "->" -> Infix
+            | _ -> Nofix
+    end
 end
 
 module L = Abt.Language.Make(Spec)
 module U = Abt.Util(L)
 
 let program =
-    U.parse_filename Sys.argv.(1) Spec.S.J
+    U.parse_filename ~sort:Spec.S.J Sys.argv.(1)
 let () = List.iter U.print program
 
 

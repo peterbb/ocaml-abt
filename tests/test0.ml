@@ -36,6 +36,13 @@ module L = struct
             | Num _ -> [], [], Expr
             | Add -> [], [[],[], Expr ; [], [], Expr ], S.Expr
     end
+
+    module F = struct
+        open Abt.Language
+        let fixity = function
+            | "+" -> Infix
+            | _ -> Nofix
+    end
 end
 
 module A = Abt.Language.Make(L)
@@ -43,7 +50,7 @@ module U = Abt.Util(A)
 
 
 let () = printf "parsing %s.\n" (Sys.argv.(1))
-let p = U.parse_filename (Sys.argv.(1)) L.S.Expr
+let p = U.parse_filename ~sort:L.S.Expr (Sys.argv.(1))
 let () = List.iter (fun e -> U.print e; Format.printf "\n") p
 
 

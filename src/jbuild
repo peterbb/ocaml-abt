@@ -9,6 +9,7 @@
 (menhir
     ((modules (parser))
      (flags (--table))))
+     ; (flags (--table --infer))))
 
 (rule
     ((targets (parser_error.ml))

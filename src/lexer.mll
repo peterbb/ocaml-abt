@@ -33,8 +33,6 @@ rule token = parse
     | ")"           { RPAR }
     | "["           { LBRACK }
     | "]"           { RBRACK }
-    | "{"           { LBRACE }
-    | "}"           { RBRACE }
 
     | sym as s      { SYM (loc lexbuf, s) }
 

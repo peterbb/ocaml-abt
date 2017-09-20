@@ -1,3 +1,11 @@
+type fixity =
+    | Nofix
+    | Infix
+
+module type FIXITY = sig
+    val fixity : string -> fixity
+end
+
 module type COMMON = sig
     type t
     val eq : t -> t -> bool
@@ -41,6 +49,7 @@ module type LANGUAGE = sig
     module S : SORT
     module O : OPERATOR
         with module S = S
+    module F : FIXITY
 end
 
 module type S = sig

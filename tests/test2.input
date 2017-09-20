@@ -1,7 +1,7 @@
 
-lam(int; x. x)
-lam({int -> int}; f. 
-    lam(int; x. ap(f; x)))
+lam(int; x. x);
+lam(int -> int; f. 
+    lam(int; x. ap(f; x)));
 
 lam(int; x.
-    lam(lam; y. y))
+    lam(lam; y. y));

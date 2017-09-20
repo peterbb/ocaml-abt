@@ -1,12 +1,9 @@
 
-type 'a loc = Loc.t * 'a
+open Surface_syntax
 
-type name = string loc
+module I = Parser.MenhirInterpreter
 
-type t =
-    Expr of name * name list * (name list * t) list
-
-module Inject (L : Language.S) = struct
+module Make (L : Language.S) = struct
     open Error
 
     type sort = L.S.t
@@ -59,12 +56,13 @@ module Inject (L : Language.S) = struct
             [], []
         | _ -> assert false
 
-    let loc_of_arg = function
+    let rec loc_of_arg = function
         | ((loc, _) :: _), _ -> loc
-        | [], Expr ((loc, _), _, _) -> loc
+        | [], E {head = (loc, _)}  -> loc
+        | [], I (e, _) -> loc_of_arg ([], e)
 
     let rec to_abt nctx vctx sort = function
-        | Expr ((l, o), [], []) ->
+        | E { head=(l, o); indexes=[]; args=[] } ->
             begin match lookup o sort vctx with
             | v ->
                 L.fold (L.Var (l, v))
@@ -74,7 +72,7 @@ module Inject (L : Language.S) = struct
                 | None ->
                     L.fold (L.Var (l, L.V.global o sort))
             end
-        | Expr ((loc, o), indexes, args) ->
+        | E { head=(loc, o); indexes; args} ->
             begin match L.O.of_string o sort with
             | None -> error ~loc "'%s' is not an operator." o
             | Some o ->
@@ -83,6 +81,7 @@ module Inject (L : Language.S) = struct
                 let args = args_to_abt nctx vctx args valences in
                 L.fold (L.App ((loc, o), indexes, args))
             end
+        | I _ -> assert false
 
     and name_to_abt nctx sort (l, x) =
         match lookup x sort nctx with
@@ -105,4 +104,55 @@ module Inject (L : Language.S) = struct
         let vars, vctx = process_binder vars var_sorts L.V.fresh vctx in
         L.abs names vars (to_abt nctx vctx sort body)
 
+
+    let rec remove_ops abt =
+        let remove_ops_arg (xs, x) = (xs, remove_ops x) in
+        match abt with
+        | E { head; indexes; args } ->
+            let args = List.map remove_ops_arg args in
+            E { head; indexes; args }
+        | I (e, []) ->
+            remove_ops e
+        | I (e0, [o, e1]) ->
+            let e0 = remove_ops e0 in
+            let e1 = remove_ops e1 in
+            E { head = o; indexes = []; args = [[], e0; [], e1]}
+        | I _ -> failwith "remove_ops not implemented"
+
+    let rec parse_loop lexbuf (checkpoint : toplevel I.checkpoint) : expr option =
+        let open Lexing in
+        match checkpoint with
+        | I.Shifting _
+        | I.AboutToReduce _ ->
+            let checkpoint = I.resume checkpoint in
+            parse_loop lexbuf checkpoint
+        | I.Accepted (Expr e) -> Some (remove_ops e)
+        | I.Accepted Eof -> None
+        | I.Rejected -> assert false
+        | I.InputNeeded env ->
+            let token = Lexer.token lexbuf
+            and startp = lexbuf.lex_start_p 
+            and endp = lexbuf.lex_curr_p in
+            let token = match token with
+                | Parser.SYM (l, o) as t->
+                    begin match L.F.fixity o with
+                    | Infix -> Parser.OP (l, o)
+                    | Nofix -> t
+                    end
+                | t -> t
+            in
+            let checkpoint = I.offer checkpoint (token, startp, endp) in
+            parse_loop lexbuf checkpoint
+        | I.HandlingError _env ->
+            Error.error "parse error"
+
+    let parse_expr lexbuf =
+        let open Lexing in
+        let init = Parser.Incremental.toplevel lexbuf.lex_curr_p in
+        parse_loop lexbuf init
+
+    let parse ~sort lexbuf =
+        match parse_expr lexbuf with
+        | Some raw -> Some (to_abt [] [] sort raw)
+        | None -> None
 end

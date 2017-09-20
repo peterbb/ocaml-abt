@@ -1,23 +1,29 @@
-%token <Loc.t * string> SYM
+%token <Loc.t * string> SYM OP
 %token EOF
-%token LPAR RPAR LBRACE RBRACE LBRACK RBRACK
+%token LPAR RPAR LBRACK RBRACK
 %token SEMICOLON DOT
 
-%{ open Syntax %}
+%{ open Surface_syntax %}
 
-%start <Syntax.t list> slurp
+%start <Surface_syntax.toplevel> toplevel
 %%
 
-slurp:
-    | es = list(expression); EOF
-        { es }
+toplevel:
+    | EOF
+        { Eof }
+    | e = expr; SEMICOLON
+        { Expr e }
 
-expression:
-    | s = SYM; args = args2
-        { Expr (s, fst args, snd args) }
-    | LBRACE; x = infix; RBRACE
-        { let (op, args) = x in
-          Expr (op, [], args) }
+expr:
+    | e0 = expr0; es = list(pair(OP, expr0))
+        { I (e0, es) }
+
+expr0:
+    | head = SYM; args = args2
+        { E { head; indexes = fst args;  args = snd args} }
+    | LPAR; e = expr; RPAR
+        { e }
+
 
 args2:
     | args = args1
@@ -32,11 +38,8 @@ args1:
         { xs }
 
 arg:
-    | e = expression
+    | e = expr
         { ([], e) }
-    | xs = nonempty_list(SYM); DOT; e = expression
+    | xs = nonempty_list(SYM); DOT; e = expr
         { (xs, e) }
 
-infix:
-    | e0 = expression; o = SYM; e1 = arg
-        { (o, [ [], e0; e1]) }
