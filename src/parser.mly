@@ -6,7 +6,6 @@
 %{ open Syntax %}
 
 %start <Syntax.t list> slurp
-%start <Syntax.t> expression
 %%
 
 slurp:

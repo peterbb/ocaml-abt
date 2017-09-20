@@ -45,41 +45,42 @@ module Symbols (S : SORT) = struct
     type sort = S.t
 
     type t =
-        | S of int * string * S.t
-        | G of string * S.t
+        | Gensym of int * string * S.t
+        | Named  of string * S.t
 
     let eq x y = match x, y with
-        | (S (i, _, _)), (S (j, _, _)) -> i = j
-        | (G (x, s)), (G (y, t)) -> x = y && S.eq s t
-        | G _, S _ | S _, G _ -> false
+        | Gensym (i, _, _), Gensym (j, _, _) -> i = j
+        | Named (x, s), Named (y, t) -> x = y && S.eq s t
+        | Gensym _, Named _ -> false
+        | Named _, Gensym _ -> false
 
     let lex x y = if x = 0 then y else x
 
     let compare x y = match x, y with
-        | S (i, _, _), S (j, _, _) -> compare i j
-        | G (x, s), G (y, t) -> lex (compare x y) (S.compare s t)
-        | S _, G _ -> -1
-        | G _, S _ -> +1
+        | Gensym (i, _, _), Gensym (j, _, _) -> compare i j
+        | Named (x, s), Named (y, t) -> lex (compare x y) (S.compare s t)
+        | Named _, Gensym _ -> -1
+        | Gensym _, Named _ -> +1
 
 
     let sort = function
-        | S (_, _, s) | G (_, s) -> s
+        | Gensym (_, _, s) | Named (_, s) -> s
 
-    let global n s = G (n, s)
+    let global n s = Named (n, s)
 
     let fresh =
         let k = ref 0 in
         fun name sort ->
             let i = !k in
             k := i + 1;
-            S (i, name, sort)
+            Gensym (i, name, sort)
 
     let refresh = function 
-        | S (_, name, sort) | G (name, sort) -> fresh name sort
+        | Gensym (_, name, sort) | Named (name, sort) -> fresh name sort
 
     let to_string = function
-        | S (i, n, _) -> Printf.sprintf "%s%d" n i
-        | G (n, _) -> n
+        | Gensym (i, n, _) -> Printf.sprintf "%s%d" n i
+        | Named (n, _) -> n
 end
 
 module type S = sig
@@ -111,6 +112,8 @@ module type S = sig
 end
 
 module Make (L : LANGUAGE) = struct
+    open Error
+
     include L
 
     module V = Symbols(S)
@@ -136,7 +139,7 @@ module Make (L : LANGUAGE) = struct
     module E = struct
         type 'a view =
             | Var of V.t loc
-            | App  of O.t loc * names * 'a abs list
+            | App of O.t loc * names * 'a abs list
     end 
 
     include I
@@ -148,28 +151,97 @@ module Make (L : LANGUAGE) = struct
         | App ((_, o), _, _) ->
             match O.arity o with (_, _, s) -> s
 
-    let (>>) f g x = f (g x)
+    let check_index (loc, name) (expected : S.t) =
+        let given = N.sort name in
+        if not (S.eq given expected) then
+            error ~loc "wrong sort"
 
-    (* This function checks whether indexes are correct,
-     * and if the bindings and the body of the arguments
-     * have the correct type. The bodies are assumed to be well
-     * typed. *)
-    let check indexes args (index_sorts, arg_valences, _) =
-        let same_sort s0 s1 =
-            if not (S.eq s0 s1) then
-                failwith "not same sort"
+    let check_indexes indexes sorts =
+        let rec loop = function
+            | [], [] -> ()
+            | (name :: indexes), (sort :: sorts) ->
+                check_index name sort;
+                loop (indexes, sorts)
+            | [], _ :: _ ->
+                error "not enough indexes"
+            | _ :: _, [] ->
+                error "too many indexes"
+        in loop (indexes, sorts)
+
+    let loc = function
+        | I.Var (l, _) | I.App ((l, _), _, _) -> l
+
+    let arg_loc = function
+        | [], ((l, _) :: _), body ->
+            Loc.join l (loc body)
+        | ((l, _) :: _), _, body ->
+            Loc.join l (loc body)
+        | [], [], body ->
+            loc body 
+
+    let check_arg (ns, xs, body) (ns_sorts, xs_sorts, body_sort) =
+        let loc = loc body in
+
+        let check_binder ~sort ~err bs bs_sorts =
+            let rec loop bs bs_sorts =
+                match bs, bs_sorts with
+                | [], [] -> ()
+                | ((loc, b) :: bs), (expected :: bs_sorts) ->
+                    loop bs bs_sorts;
+                    let given = sort b in
+                    if not (S.eq given expected) then
+                        (err loc b given expected)
+                | [], (_ :: _) ->
+                    error ~loc "argument should have more binders"
+                | (_ :: _), [] ->
+                    error ~loc "argument has too many binders"
+            in loop bs bs_sorts
         in
-        let check_arg (ns, xs, body) (ns_sorts, xs_sorts, body_sort) =
-            let ns = List.map (N.sort >> snd) ns in 
-            let xs = List.map (V.sort >> snd) xs in
-            List.iter2 same_sort ns ns_sorts;
-            List.iter2 same_sort xs xs_sorts;
-            if not (S.eq (sort body) body_sort) then
-                failwith "type error"
+        let name_binder_sort_error loc name given expected =
+            error ~loc ""
         in
-        let indexes = List.map (N.sort >> snd) indexes in
-        List.iter2 same_sort indexes index_sorts;
-        List.iter2 check_arg args arg_valences
+
+        let var_binder_sort_error loc var given expected =
+            error ~loc ""
+        in
+        check_binder ~sort:N.sort ~err:name_binder_sort_error  ns ns_sorts;
+        check_binder ~sort:V.sort ~err:var_binder_sort_error xs xs_sorts;
+        if not (S.eq (sort body) body_sort) then
+            error ~loc "terms is of sort %s, but should be of sort %s."
+                (S.to_string (sort body)) (S.to_string body_sort)
+
+    let valence_to_string (ss0, ss1, s) =
+        let list _start _end = function
+            | [] -> ""
+            | xs ->
+                let xs = List.map S.to_string xs in
+                let xs = String.concat " " xs in
+                _start ^ xs ^ _end
+        in
+        Printf.sprintf "%s%s%s"
+            (list "{" "}" ss0)
+            (list "(" ")" ss1)
+            (S.to_string s)
+
+    let check_args ~loc ~o args valences =
+        let rec loop = function
+            | [], [] -> ()
+            | arg::args, valence::valences ->
+                check_arg arg valence;
+                loop (args, valences)
+            | [], (_ :: _ as valences) ->
+                let plural = match valences with [_] -> "" | _ -> "s" in
+                let valences = List.map valence_to_string valences in
+                error ~loc
+                    "operator '%s' is missing argument%s of valence%s %s."
+                    (O.to_string o) plural plural
+                    (String.concat " " valences)
+            | arg :: _, [] ->
+                let loc = arg_loc arg in
+                error ~loc "operator '%s' is applied to %d arguments"
+                    (O.to_string o)
+                    (List.length args)
+        in loop (args, valences)
 
     let unfold = function
         | I.App (o, ns, args) ->
@@ -185,10 +257,14 @@ module Make (L : LANGUAGE) = struct
     let fold = function
         | E.Var (l, x) ->
             I.Var (l, Free x)
-        | E.App ((l, o), ns, args) ->
-            check ns args (O.arity o);
-            I.App ((l, o), List.map (fun (l, n) -> l, Free n) ns, args)
+        | E.App ((loc, o), ns, args) ->
+            let (index_sorts, valences, _) = O.arity o in
+            check_indexes ns index_sorts;
+            check_args ~loc ~o args valences;
+            I.App ((loc, o), List.map (fun (l, n) -> l, Free n) ns, args)
 
+    (* [apply subst term], where [subst] is a list of n closed
+     * terms, and [term] is a term with n free de bruijn indexes.  *)
     let apply subst =
         let lookup index x = List.nth subst (x - index) in
 
@@ -197,7 +273,7 @@ module Make (L : LANGUAGE) = struct
             | I.Var (_, Bound (i, _)) as x ->
                 begin match lookup index i with
                 | t -> t
-                | exception _ -> x
+                | exception Invalid_argument _ -> x
                 end
             | I.App (o, ns, args) ->
                 let ns = List.map (subst_name index) ns in
@@ -208,18 +284,29 @@ module Make (L : LANGUAGE) = struct
             | _, Bound (i, _) as n ->
                 begin match lookup index i with
                 | I.Var (l, x) -> (l, x)
-                | I.App _ -> failwith "internal error: subst_name"
-                | exception _ -> n
+                | exception Invalid_argument _ -> n
+                | I.App _ -> assert false
                 end
         and subst_args index (names, args, body) = 
             let index = index + List.length names + List.length args in
             (names, args, subst_tm index body)
+
         in subst_tm 0
 
-    let subst_rename_abs names values (_, _, body) =
+    let check_term term expected = 
+        let given = sort term in
+        if not (S.eq expected given) then
+            error ~loc:(loc term)
+                "term has wrong sort. expected %s, got %s"
+                (S.to_string expected) (S.to_string given)
+
+    let subst_rename_abs names terms (name_binders, term_binders, body) =
+        let name_sorts = List.map (fun (_, n) -> N.sort n) name_binders in
+        let term_sorts = List.map (fun (_, x) -> V.sort x) term_binders in
+        check_indexes names name_sorts;
+        List.iter2 check_term terms term_sorts;
         let f (l, x) = I.Var (l, Free x) in
-        let sigma = List.rev ((List.map f names) @ values) in
-        (* TODO: type check *)
+        let sigma = List.rev ((List.map f names) @ terms) in
         apply sigma body
 
     let refresh_all = List.map (fun (l, x) -> (l, V.refresh x))
@@ -240,7 +327,6 @@ module Make (L : LANGUAGE) = struct
         (args, subst_rename_abs names vals body)
 
     let abs (names : names) (vars : vars) body =
-
         let find x =
             let rec loop index = function
             | [] -> raise Not_found
@@ -283,6 +369,8 @@ module Make (L : LANGUAGE) = struct
                 I.App (o, ns, List.map subst_arg args)
         and subst_arg (names, args, body) = 
             (names, args, subst body)
-        in subst
+        in
+        check_term term (V.sort x);
+        subst
 end
 

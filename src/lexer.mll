@@ -3,7 +3,7 @@
     open Lexing 
     open Parser
 
-    let pos lexbuf =
+    let loc lexbuf =
         Loc.{
             _start = lexeme_start_p lexbuf;
             _end = lexeme_end_p lexbuf;
@@ -17,7 +17,7 @@ let newline = "\r" | "\n" | "\r\n"
 let digit = ['0'-'9']
 let letter = ['a'-'z' 'A'-'Z']
 let other0 = '_' | '-' | '@' | '+' | '#' | '!' | '%' | '&' | '^' | '='
-let other1 = '?' | '<' | '>' | ":" | "\\"
+let other1 = '?' | '<' | '>' | ":" | "\\" | '/'
 let sym = (digit | letter | other0 | other1)+
 
 
@@ -36,7 +36,7 @@ rule token = parse
     | "{"           { LBRACE }
     | "}"           { RBRACE }
 
-    | sym as s      { SYM (pos lexbuf, s) }
+    | sym as s      { SYM (loc lexbuf, s) }
 
 and comment = parse
     | "*)"          { () }

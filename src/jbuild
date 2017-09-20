@@ -2,7 +2,17 @@
 
 (library
   ((name abt)
-   (public_name ocaml-abt)))
+   (public_name ocaml-abt)
+   (libraries (menhirlib))))
 
 (ocamllex (lexer))
-(menhir ((modules (parser))))
+(menhir
+    ((modules (parser))
+     (flags (--table))))
+
+(rule
+    ((targets (parser_error.ml))
+     (deps    (parser_error.messages parser.mly))
+     (action  (with-stdout-to ${@}
+                (run menhir --compile-errors ${<} parser.mly)))))
+

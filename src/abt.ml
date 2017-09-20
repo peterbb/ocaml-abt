@@ -12,15 +12,37 @@ module Util (L : Language.S) = struct
         else
             failwith "wrong sort"
 
-    let parse_expression lexbuf sort =
-        let abt = Parser.expression Lexer.token lexbuf
-                  |> Reader.to_abt [] [] sort in
-        check_correct_sort sort abt;
-        abt
 
+    module I = Parser.MenhirInterpreter
+
+    let succeed xs = xs
+
+    let fail lexbuf = function
+        | I.HandlingError env ->
+            begin match I.top env with
+            | Some (I.Element (state, _, _start, _end))  ->
+                let state = I.number state in
+                let loc = Loc.{ _start; _end } in
+                Error.error ~loc "%s" (Parser_error.message state)
+            | None ->
+                let _start = lexbuf.Lexing.lex_start_p
+                and _end = lexbuf.Lexing.lex_curr_p in
+                let loc = Loc.{ _start ; _end } in
+                Error.error ~loc
+                    "parse error: expected an expression, but found '%s'."
+                    (Lexing.lexeme lexbuf)
+            end
+        | _ -> assert false
+
+    let parse_loop lexbuf result =
+        let supplier = I.lexer_lexbuf_to_supplier Lexer.token lexbuf in
+        I.loop_handle succeed (fail lexbuf) supplier result
+
+    let slurp lexbuf =
+        parse_loop lexbuf (Parser.Incremental.slurp lexbuf.lex_curr_p)
+        
     let parse_file lexbuf sort =
-        let ps = Parser.slurp Lexer.token lexbuf
-                 |> List.map (Reader.to_abt [] [] sort)
+        let ps = slurp lexbuf |> List.map (Reader.to_abt [] [] sort)
         in 
         List.iter (check_correct_sort sort) ps;
         ps

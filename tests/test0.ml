@@ -41,16 +41,9 @@ end
 module A = Abt.Language.Make(L)
 module U = Abt.Util(A)
 
-let parse filename =
-    let ich = open_in filename in
-    let lexbuf = Lexing.from_channel ich in
-    let program = U.parse_file lexbuf L.S.Expr in
-    close_in ich;
-    program
-
 
 let () = printf "parsing %s.\n" (Sys.argv.(1))
-let p = parse (Sys.argv.(1))
+let p = U.parse_filename (Sys.argv.(1)) L.S.Expr
 let () = List.iter (fun e -> U.print e; Format.printf "\n") p
 
 
