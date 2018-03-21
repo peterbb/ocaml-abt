@@ -3,7 +3,7 @@
 (library
   ((name abt)
    (public_name ocaml-abt)
-   (libraries (menhirlib))))
+   (libraries (menhirLib))))
 
 (ocamllex (lexer))
 (menhir
