@@ -10,6 +10,11 @@ variables (subject to substitution) and symbols (subject to renameing).
 Terms are considered equal up to renaming of bound variables and symbols.
 * A pretty printer and a parser.
 
+## Building
+
+The library depends on `menhirLib`. Build by executing `jbuilder build`. Run
+tests by executing `jbuilder runtest`.
+
 ## Credits
 Based on ABT's as described in Robert Harper's Practical Foundations of Programming Languages and Jon Sterling's implementation in SML.
 
